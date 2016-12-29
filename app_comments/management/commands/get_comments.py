@@ -27,10 +27,10 @@ class Command(BaseCommand):
     def handle(s, *args, **options):
         url, orig_url = s.process_args(options)
 
-        existing_data = get_object_or_None(RedditPost, url=url)
-        if existing_data:
+        reddit_post = get_object_or_None(RedditPost, url=orig_url)
+        if reddit_post:
             print('Found from DB.\n\n')
-            text_json = existing_data
+            text_json = reddit_post.json_data
         else:
             # http
             print('Getting by http: %s' % url)
@@ -53,5 +53,14 @@ class Command(BaseCommand):
 
         comment_json = json.loads(text_json)
 
-        comment_section = RedditPostBuilder(orig_url, comment_json)
+        if not reddit_post.loaded:
+            reddit_post.children.all().delete()
+            rpb = RedditPostBuilder(orig_url, comment_json)
+            reddit_post = rpb.build()
+
+        # c = Comment.objects.filter(_id='dbnr8tc').all()[0]
+        # print(c.name)
+        # print(c.children.all())
+
+        # if not reddit_post.visited:
 

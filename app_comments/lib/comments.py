@@ -1,11 +1,12 @@
-import json
+import json, sys
 from app_comments.lib.util import Printer
-from app_comments.models import Comment
+from app_comments.models import Comment, RedditPost
+from annoying.functions import get_object_or_None
 
 
 class CommentBuilder(Printer):
 
-    def __init__(s, data):
+    def __init__(s, data, reddit_post=None, parent_comment=None):
         s.visited = False
 
         s.data = data
@@ -13,35 +14,34 @@ class CommentBuilder(Printer):
         s._id = None
         s.body = None
         s.score = None
+        s.reddit_post = reddit_post
+        s.parent_comment = parent_comment
+        s.is_reference = False
 
-        if not data.get('body'): ### fix
-            s.children = []
-            return
+        s._id = data['id']
+        s.name = data.get('name')
+        s.reddit_parent_id = data.get('parent_id')
+        s.body = data['body'].replace('\n', '\n\t\t')
+        s.score = int(data['score'])
 
-        if data.get('replies') and isinstance(data['replies'], dict):
-            s._id = data['id']
-            s.body = data['body'].replace('\n', '\n\t\t')
-            s.score = int(data['score'])
-        else:
-            s.children = []
+    def build(s):
+        comment = get_object_or_None(Comment, _id=s._id)
+        if comment:
+            return comment
 
-        return s.build(data)
+        comment = Comment(body=s.body, score=s.score, _id=s._id, visited=s.visited,
+                          reddit_post=s.reddit_post, parent=s.parent_comment,
+                          name=s.name)
+        comment.save()
 
-    def build(s, data):
+        if s.data.get('replies') and isinstance(s.data['replies'], dict):
+            for j in s.data['replies']['data']['children']:
+                if j['kind'] != 'more':
+                    cb = CommentBuilder(j['data'], reddit_post=s.reddit_post, parent_comment=comment)
+                    child_comment = cb.build()
+                    comment.children.add(child_comment)
 
-        new_comment = Comment(body=s.body, score=s.score, _id=s._id, visited=s.visited)
-        new_comment.save()
-
-        for j in data['replies']['data']['children']:
-            CommentBuilder(j['data'])
-        #new_comment.children = [ for j in]
-
-        return new_comment
-        # for child_comment in s.children:
-        #     new_comment.children.add(child_comment)
-
-    # def x(s):
-    #     print(s.children[0].children[0].body)
+        return comment
 
 
 class RedditPostBuilder(Printer):
@@ -51,29 +51,24 @@ class RedditPostBuilder(Printer):
         s.body = 'STUB'
         s.score = None
 
+        s.data = data
+
         s.url = url
 
-        post_data = data[0]['data']
-        print(post_data)
+        post_data = data[0]['data']['children'][0]['data']
+        # print(post_data)
         s.title = post_data['title']
         s._id = post_data['id']
 
-        return s.build(data)
+    def build(s):
+        existing_rp = reddit_post = get_object_or_None(RedditPost, _id=s._id)
+        if not reddit_post:
+            reddit_post = RedditPost(_id=s._id, visited=s.visited, url=s.url, title=s.title, json_data=json.dumps(s.data))
+            reddit_post.save()
 
-    def build(s, data):
-        if get_object_or_None(RedditPost, _id=s._id):
-            print('Post already found.')
-            return
+        for j in s.data[1]['data']['children'][:-1]:
+            if j.get('data'):
+                cb = CommentBuilder(j['data'], reddit_post=reddit_post)
+                new_comment = cb.build()
 
-        new_rp = RedditPost(_id=s._id, visited=s.visited, url=s.url, title=s.title, json_data=json.dumps(data))
-        new_rp.save()
-
-        # for j in data[1]['data']['children'][:-1]:
-        #     if j.get('data'):
-        #          #new_comment = CommentBuilder(j['data'])
-        # #new_comment.children
-
-        return new_rp
-
-    # def children(s):
-    #     pass
+        return reddit_post
