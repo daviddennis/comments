@@ -16,9 +16,13 @@ class RedditPost(models.Model):
     #children = models.ForeignKey("Comment", null=True, related_name=)
 
     def __str__(s):
-        return '%s (%s)' % (s.title, s.url)
+        return 'Post: "%s"' % (s.title,)  # s.url)
 
     # def children(s):
+
+    @property
+    def score(s):
+        return None
 
 
 class Comment(models.Model):
@@ -36,7 +40,11 @@ class Comment(models.Model):
     visited = models.BooleanField(default=False)
 
     def __str__(s):
-        return '(%s) %s' % (s._id, s.body)
+        return '(%s) %s' % (s.post_title_stub, s.body)
+
+    @property
+    def post_title_stub(s):
+        return s.reddit_post.title[:10]+'...' if s.reddit_post else '?'
 
     @property
     def num_children(s):
@@ -45,3 +53,18 @@ class Comment(models.Model):
     @property
     def short_body(s):
         return s.body[:100]+'...'
+
+
+class Increase(models.Model):
+
+    reddit_post = models.ForeignKey(RedditPost, null=True)
+
+    parent_comment = models.ForeignKey(Comment, related_name='parent_increases')
+    child_comment = models.ForeignKey(Comment, related_name='child_increases')
+
+    percent = models.IntegerField(null=True)
+
+    def __str__(s):
+        return '(%s) (+%s%%) (%s->%s) %s >> %s' % (s.parent_comment.post_title_stub,
+                                                   s.percent, s.parent_comment.score, s.child_comment.score,
+                                                   s.parent_comment.body[:10], s.child_comment.body[:10])

@@ -26,3 +26,11 @@ class Printer:
             if len(text) <= length:
                 print(('\t'*begin_tabs)+text)
                 break
+
+
+def get_json_link(url):
+    if not url:
+        raise Exception()
+    if url and url[-5:] != '.json':
+        return url[:-1] + '.json'
+    raise Exception('Wrong link format')

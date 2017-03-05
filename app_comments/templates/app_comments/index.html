@@ -3,6 +3,33 @@
         <title>Comments</title>
     </head>
     <body>
-        <h1>hello</h1>
+
+        <!-- Title -->
+        <h1>Flavorful Comments</h1>
+
+        <!-- Enter Link -->
+        <font>Enter Reddit Link:</font>
+        <form action='/comments/get_link' method='GET'>
+            <input name='link' type='text' style='width: 600px;'/> <button type='submit'>Get</button>
+        </form>
+
+        <!-- Comment List -->
+        {% for inc in increases %}
+            <ul>
+                <li>+{{ inc.percent }}%
+                <li>
+                    <b><a href={{ inc.parent_comment.reddit_post.url }}>{{ inc.parent_comment.reddit_post.title }}</a></b>
+                </li>
+                    <ul>
+                        <li>{{ inc.parent_comment.body }}
+                            <ul>
+                                <li>{{ inc.child_comment.body }}</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </li>
+            </ul>
+        {% endfor %}
+
     </body>
 </html>

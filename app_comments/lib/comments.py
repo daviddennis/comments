@@ -1,6 +1,8 @@
-import json, sys
+import json
+import sys
+import requests
 from app_comments.lib.util import Printer
-from app_comments.models import Comment, RedditPost
+from app_comments.models import Comment, RedditPost, Increase
 from annoying.functions import get_object_or_None
 
 
@@ -72,3 +74,73 @@ class RedditPostBuilder(Printer):
                 new_comment = cb.build()
 
         return reddit_post
+
+
+class PostGetter:
+
+    def get(s, url, orig_url):
+        reddit_post = get_object_or_None(RedditPost, url=orig_url)
+        if reddit_post:
+            print('Found from DB.\n\n')
+            text_json = reddit_post.json_data
+        else:
+            # http
+            print('Getting by http: %s' % url)
+            resp = requests.get(url)
+            if resp.status_code == 200:
+                received_text = resp.text
+                #print(received_text[:5])
+            else:
+                # print(resp.text)
+                # print('Reading from file...')
+                # with open('comment.json') as fp:
+                #     received_text = fp.read()
+                print(resp.text)
+                return 'bad http'
+            if not received_text:
+                print('No text gotten')
+            text_json = received_text
+
+        if not text_json:
+            raise Exception('No JSON text found')
+
+        #print(text_json, '>>')
+
+        comment_json = json.loads(text_json)
+
+        if (reddit_post and not reddit_post.loaded) or reddit_post is None:
+            rpb = RedditPostBuilder(orig_url, comment_json)
+            reddit_post = rpb.build()
+            reddit_post.loaded = True
+            reddit_post.save()
+            print('Post loaded.')
+            return True
+
+
+def dfs(node, count, parent=None, limit=100, post=None):
+    if count >= 11:
+        return
+
+    if not node:
+        return
+
+    node.visited = True
+
+    if parent and parent.score and node.score:
+        if parent.score < node.score:
+            pct = int((node.score/float(parent.score)*100) - 100)
+            if pct > limit:
+
+                incr_data = {'parent_comment': parent,
+                             'child_comment': node,
+                             'percent': pct,
+                             'reddit_post': post}
+
+                if not Increase.objects.filter(**incr_data).all():
+                    # record
+                    new_increase = Increase(**incr_data)
+                    new_increase.save()
+
+    for c in node.children.all():
+        if not c.visited:
+            dfs(c, count+1, parent=node, post=post)
