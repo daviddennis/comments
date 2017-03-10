@@ -1,0 +1,31 @@
+<html>
+    <head>
+        <title>Comments</title>
+    </head>
+    <body>
+
+    	<a href='/comments'>Home</a>
+
+        <!-- Title -->
+        <h1>Flavorful Comments</h1>
+
+        <!-- Comment List -->
+        {% for inc in increases %}
+            <ul>
+                <li>+{{ inc.percent }}%
+                <li>
+                    <b><a href={{ inc.parent_comment.reddit_post.url }}>{{ inc.parent_comment.reddit_post.title }}</a></b>
+                </li>
+                    <ul>
+                        <li>{{ inc.parent_comment.body }}
+                            <ul>
+                                <li>{{ inc.child_comment.body }}</li>
+                            </ul>
+                        </li>
+                    </ul>
+                </li>
+            </ul>
+        {% endfor %}
+
+    </body>
+</html>

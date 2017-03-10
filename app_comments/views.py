@@ -5,7 +5,7 @@ from django.http import HttpResponse, Http404
 
 from app_comments.models import Increase, RedditPost
 from app_comments.lib.comments import PostGetter, dfs
-from app_comments.lib.util import get_json_link
+from app_comments.lib.util import get_json_link, get_basic_link
 
 
 def index(request):
@@ -33,12 +33,13 @@ def get_link(request):
         raise Exception('Not a url')
 
     json_url = get_json_link(url)
+    basic_url = get_basic_link(url)
 
-    reddit_post = get_object_or_None(RedditPost, url=json_url)
+    reddit_post = get_object_or_None(RedditPost, url=basic_url)
 
     if not reddit_post:
         pg = PostGetter()
-        resp = pg.get(json_url, json_url)
+        resp = pg.get(json_url)
 
         if not resp:
             raise Http404('Not loaded correctly')

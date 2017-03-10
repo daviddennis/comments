@@ -1,7 +1,7 @@
 import json
 import sys
 import requests
-from app_comments.lib.util import Printer
+from app_comments.lib.util import Printer, get_basic_link, get_json_link
 from app_comments.models import Comment, RedditPost, Increase
 from annoying.functions import get_object_or_None
 
@@ -75,46 +75,105 @@ class RedditPostBuilder(Printer):
 
         return reddit_post
 
+# def get_post(url):
+#     if not url:
+#         raise Exception('!')
+#     basic_url = get_basic_link(url)
+#     if not basic_url:
+#         raise Exception('!')
+#     reddit_post = get_object_or_None(RedditPost, url=orig_url)
+#     if reddit_post:
+
 
 class PostGetter:
 
-    def get(s, url, orig_url):
-        reddit_post = get_object_or_None(RedditPost, url=orig_url)
-        if reddit_post:
-            print('Found from DB.\n\n')
-            text_json = reddit_post.json_data
-        else:
-            # http
-            print('Getting by http: %s' % url)
-            resp = requests.get(url)
-            if resp.status_code == 200:
-                received_text = resp.text
-                #print(received_text[:5])
-            else:
-                # print(resp.text)
-                # print('Reading from file...')
-                # with open('comment.json') as fp:
-                #     received_text = fp.read()
-                print(resp.text)
-                return 'bad http'
-            if not received_text:
-                print('No text gotten')
-            text_json = received_text
-
-        if not text_json:
-            raise Exception('No JSON text found')
-
-        #print(text_json, '>>')
-
-        comment_json = json.loads(text_json)
-
-        if (reddit_post and not reddit_post.loaded) or reddit_post is None:
-            rpb = RedditPostBuilder(orig_url, comment_json)
+    def build_reddit_post(self, url, json_text, reddit_post=None):
+        comment_json = json.loads(json_text)
+        if not reddit_post or (reddit_post and not reddit_post.loaded):
+            rpb = RedditPostBuilder(url, comment_json)
             reddit_post = rpb.build()
             reddit_post.loaded = True
             reddit_post.save()
             print('Post loaded.')
-            return True
+            return reddit_post
+
+    def get(self, url):
+        basic_url = get_basic_link(url)
+        reddit_post = get_object_or_None(RedditPost, url=basic_url)
+        if reddit_post:
+            print('Found from DB.')
+            return reddit_post
+            # if not reddit_post.json_data
+            # return self.build_reddit_post(basic_url,
+            #                               reddit_post,
+            #                               reddit_post.json_data)
+        else:
+            json_link = get_json_link(basic_url)
+            print('Getting by http: %s' % json_link)
+            json_text = self.get_by_http(json_link)
+            print(json_text[:200])
+            return self.build_reddit_post(basic_url,
+                                          json_text)
+
+    def get_by_http(self, url):
+        resp = requests.get(url)
+        if resp.status_code == 200:
+            json_text = resp.text
+            #print(received_text[:5])
+        else:
+            print(resp.text)
+            raise Exception('bad http')
+
+        if not json_text:
+            raise Exception('No JSON text found')
+
+        return json_text
+
+        # print(resp.text)
+        # print('Reading from file...')
+        # with open('comment.json') as fp:
+        #     received_text = fp.read()
+
+
+# class PostGetter:
+
+#     def get(s, url, orig_url):
+#         reddit_post = get_object_or_None(RedditPost, url=orig_url)
+#         if reddit_post:
+#             print('Found from DB.\n\n')
+#             text_json = reddit_post.json_data
+#         else:
+#             # http
+#             print('Getting by http: %s' % url)
+#             resp = requests.get(url)
+#             if resp.status_code == 200:
+#                 received_text = resp.text
+#                 #print(received_text[:5])
+#             else:
+#                 # print(resp.text)
+#                 # print('Reading from file...')
+#                 # with open('comment.json') as fp:
+#                 #     received_text = fp.read()
+#                 print(resp.text)
+#                 return 'bad http'
+#             if not received_text:
+#                 print('No text gotten')
+#             text_json = received_text
+
+#         if not text_json:
+#             raise Exception('No JSON text found')
+
+#         #print(text_json, '>>')
+
+#         comment_json = json.loads(text_json)
+
+#         if (reddit_post and not reddit_post.loaded) or reddit_post is None:
+#             rpb = RedditPostBuilder(orig_url, comment_json)
+#             reddit_post = rpb.build()
+#             reddit_post.loaded = True
+#             reddit_post.save()
+#             print('Post loaded.')
+#             return reddit_post
 
 
 def dfs(node, count, parent=None, limit=100, post=None):
